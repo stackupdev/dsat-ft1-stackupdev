@@ -1,6 +1,8 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for, flash
 import joblib
 from groq import Groq
+import sqlite3
+from datetime import datetime
 
 import os
 
@@ -12,11 +14,59 @@ app = Flask(__name__)
 def index():
     return(render_template("index.html"))
 
-@app.route("/main",methods=["GET","POST"])
+def get_db_connection():
+    conn = sqlite3.connect('user.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+@app.route("/main", methods=["GET", "POST"])
 def main():
-    q = request.form.get("q")
-    # db
-    return(render_template("main.html"))
+    conn = get_db_connection()
+    users = conn.execute('SELECT * FROM user ORDER BY timestamp DESC').fetchall()
+    conn.close()
+    return render_template("main.html", users=users)
+
+@app.route("/add_user", methods=["POST"])
+def add_user():
+    username = request.form.get('username')
+    if not username:
+        flash('Username is required!')
+        return redirect(url_for('main'))
+    
+    try:
+        conn = get_db_connection()
+        conn.execute('INSERT INTO user (name, timestamp) VALUES (?, ?)', 
+                    (username, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+        conn.close()
+        log_action('ADD', username)
+        flash('User added successfully!', 'success')
+    except sqlite3.IntegrityError:
+        flash('User already exists!', 'error')
+    
+    return redirect(url_for('main'))
+
+@app.route("/delete_user", methods=["POST"])
+def delete_user():
+    username = request.form.get('username')
+    if not username:
+        flash('Username is required!')
+        return redirect(url_for('main'))
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM user WHERE name = ?', (username,))
+    rows_deleted = cursor.rowcount
+    conn.commit()
+    
+    if rows_deleted > 0:
+        log_action('DELETE', username)
+        flash('User deleted successfully!', 'success')
+    else:
+        flash('User not found!', 'error')
+    conn.close()
+    
+    return redirect(url_for('main'))
 
 @app.route("/llama",methods=["GET","POST"])
 def llama():
@@ -133,6 +183,47 @@ def webhook():
         })
     return('ok', 200)
 
+def log_action(action, username):
+    """Log user actions to the database"""
+    conn = get_db_connection()
+    conn.execute('''
+        INSERT INTO logs (action, username, timestamp) 
+        VALUES (?, ?, ?)
+    ''', (action, username, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+    conn.commit()
+    conn.close()
+
+@app.route("/logs")
+def view_logs():
+    """Display all logs"""
+    conn = get_db_connection()
+    logs = conn.execute('''
+        SELECT * FROM logs 
+        ORDER BY timestamp DESC
+    ''').fetchall()
+    conn.close()
+    return render_template("logs.html", logs=logs)
+
 if __name__ == "__main__":
-    app.run()
+    # Initialize database tables if they don't exist
+    conn = sqlite3.connect('user.db')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS user (
+            name TEXT PRIMARY KEY,
+            timestamp TIMESTAMP
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            action TEXT NOT NULL,
+            username TEXT NOT NULL,
+            timestamp TIMESTAMP NOT NULL
+        )
+    ''')
+    conn.close()
+    
+    # Add flash message support
+    app.secret_key = 'your-secret-key-here'  # Change this to a secure secret key
+    app.run(debug=True)
 
