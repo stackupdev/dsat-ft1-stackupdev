@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for, session
 import joblib
 from groq import Groq
 
@@ -11,6 +11,7 @@ import datetime
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'  # Needed for session management
 
 @app.route("/",methods=["GET","POST"])
 def index():
@@ -18,13 +19,21 @@ def index():
 
 @app.route("/main",methods=["GET","POST"])
 def main():
-    q = request.form.get("q")
-    # db - insert
-    conn = sqlite3.connect('user.db')
-    conn.execute('INSERT INTO user (name, timestamp) VALUES (?, ?)', (q, datetime.datetime.now()))
-    conn.commit()
-    conn.close()
-    return(render_template("main.html"))
+    if request.method == "POST":
+        q = request.form.get("q")
+        session['username'] = q
+        # db - insert
+        conn = sqlite3.connect('user.db')
+        conn.execute('INSERT INTO user (name, timestamp) VALUES (?, ?)', (q, datetime.datetime.now()))
+        conn.commit()
+        conn.close()
+    username = session.get('username')
+    return render_template("main.html", username=username)
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('index'))
 
 @app.route("/llama",methods=["GET","POST"])
 def llama():

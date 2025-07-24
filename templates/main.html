@@ -6,6 +6,9 @@
 </head>
 <body>
     <div class="container">
+    {% if username %}
+        <div style="text-align:right; font-weight:bold;">Welcome, {{ username }}!</div>
+    {% endif %}
     <h2>Main</h2>
         <form action="/llama" method="post">
             <input type="submit" value="LLAMA chatbot via groq">
@@ -32,6 +35,9 @@
             <input type="submit" value="DELETE LOG">    
         </form>
 
+        <form action="/logout" method="post" style="margin-top: 20px;">
+            <input type="submit" value="Logout" style="background:#dc3545;color:white;">
+        </form>
     </div>
 </body>
 
