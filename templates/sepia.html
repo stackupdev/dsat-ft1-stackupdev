@@ -7,16 +7,14 @@
         filename='styles.css') }}">
 </head>
 <body>
-    <script
-        type="module"
-        src="https://gradio.s3-us-west-2.amazonaws.com/5.38.1/gradio.js"
-    ></script>
-
-    <gradio-app src="https://stackupdevc-sepia-ds1f.hf.space"></gradio-app>
-    
-    <div class="container">
-        <form action="/main" method="post">
-            <input type="submit" value="Back to Main">
+    <div class="container" style="max-width: 600px; margin: 0 auto; text-align: center;">
+        <script
+            type="module"
+            src="https://gradio.s3-us-west-2.amazonaws.com/5.38.1/gradio.js"
+        ></script>
+        <gradio-app src="https://stackupdevc-sepia-ds1f.hf.space"></gradio-app>
+        <form action="/main" method="post" style="margin-top: 20px;">
+            <input type="submit" value="Back to Main" style="padding: 8px 16px;">
         </form>
     </div>
 </body>
