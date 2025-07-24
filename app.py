@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request
 import joblib
 from groq import Groq
-import sqlite3
-from datetime import datetime
 
 import os
+
+import sqlite3
+import datetime
+
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
@@ -14,59 +16,15 @@ app = Flask(__name__)
 def index():
     return(render_template("index.html"))
 
-def get_db_connection():
-    conn = sqlite3.connect('user.db')
-    conn.row_factory = sqlite3.Row
-    return conn
-
-@app.route("/main", methods=["GET", "POST"])
+@app.route("/main",methods=["GET","POST"])
 def main():
-    conn = get_db_connection()
-    users = conn.execute('SELECT * FROM user ORDER BY timestamp DESC').fetchall()
-    conn.close()
-    return render_template("main.html", users=users)
-
-@app.route("/add_user", methods=["POST"])
-def add_user():
-    username = request.form.get('username')
-    if not username:
-        flash('Username is required!')
-        return redirect(url_for('main'))
-    
-    try:
-        conn = get_db_connection()
-        conn.execute('INSERT INTO user (name, timestamp) VALUES (?, ?)', 
-                    (username, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-        conn.commit()
-        conn.close()
-        log_action('ADD', username)
-        flash('User added successfully!', 'success')
-    except sqlite3.IntegrityError:
-        flash('User already exists!', 'error')
-    
-    return redirect(url_for('main'))
-
-@app.route("/delete_user", methods=["POST"])
-def delete_user():
-    username = request.form.get('username')
-    if not username:
-        flash('Username is required!')
-        return redirect(url_for('main'))
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM user WHERE name = ?', (username,))
-    rows_deleted = cursor.rowcount
+    q = request.form.get("q")
+    # db - insert
+    conn = sqlite3.connect('user.db')
+    conn.execute('INSERT INTO user (name, timestamp) VALUES (?, ?)', (q, datetime.datetime.now()))
     conn.commit()
-    
-    if rows_deleted > 0:
-        log_action('DELETE', username)
-        flash('User deleted successfully!', 'success')
-    else:
-        flash('User not found!', 'error')
     conn.close()
-    
-    return redirect(url_for('main'))
+    return(render_template("main.html"))
 
 @app.route("/llama",methods=["GET","POST"])
 def llama():
@@ -125,7 +83,7 @@ import requests
 
 @app.route("/telegram",methods=["GET","POST"])
 def telegram():
-    domain_url = 'https://dsat-ft1-stackupdev.onrender.com'
+    domain_url = 'https://dsat-ft1.onrender.com'
     # The following line is used to delete the existing webhook URL for the Telegram bot
     delete_webhook_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook"
     requests.post(delete_webhook_url, json={"url": domain_url, "drop_pending_updates": True})
@@ -141,7 +99,7 @@ def telegram():
 
 @app.route("/stop_telegram",methods=["GET","POST"])
 def stop_telegram():
-    domain_url = 'https://dsat-ft1-stackupdev.onrender.com'
+    domain_url = 'https://dsat-ft1.onrender.com'
     # The following line is used to delete the existing webhook URL for the Telegram bot
     delete_webhook_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook"
     webhook_response = requests.post(delete_webhook_url, json={"url": domain_url, "drop_pending_updates": True})
@@ -183,47 +141,28 @@ def webhook():
         })
     return('ok', 200)
 
-def log_action(action, username):
-    """Log user actions to the database"""
-    conn = get_db_connection()
-    conn.execute('''
-        INSERT INTO logs (action, username, timestamp) 
-        VALUES (?, ?, ?)
-    ''', (action, username, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+@app.route("/user_log",methods=["GET","POST"])
+def user_log():
+    conn = sqlite3.connect('user.db')
+    c = conn.cursor()
+    c.execute('''select * from user''')
+    r=""
+    for row in c:
+      print(row)
+      r = r + str(row)
+    c.close()
+    conn.close()
+    return render_template("user_log.html", r=r)
+
+@app.route("/delete_log",methods=["GET","POST"])
+def delete_log():
+    conn = sqlite3.connect('user.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM user')
     conn.commit()
     conn.close()
-
-@app.route("/logs")
-def view_logs():
-    """Display all logs"""
-    conn = get_db_connection()
-    logs = conn.execute('''
-        SELECT * FROM logs 
-        ORDER BY timestamp DESC
-    ''').fetchall()
-    conn.close()
-    return render_template("logs.html", logs=logs)
+    return render_template("delete_log.html", message="User log deleted successfully.")
 
 if __name__ == "__main__":
-    # Initialize database tables if they don't exist
-    conn = sqlite3.connect('user.db')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS user (
-            name TEXT PRIMARY KEY,
-            timestamp TIMESTAMP
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            action TEXT NOT NULL,
-            username TEXT NOT NULL,
-            timestamp TIMESTAMP NOT NULL
-        )
-    ''')
-    conn.close()
-    
-    # Add flash message support
-    app.secret_key = 'your-secret-key-here'  # Change this to a secure secret key
-    app.run(debug=True)
+    app.run()
 
