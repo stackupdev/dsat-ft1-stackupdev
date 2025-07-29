@@ -1,4 +1,4 @@
-# DSAI Chatbot & Prediction Web App developed on SCTP-DS1F
+# DSAI Chatbot & Prediction Web Flask App 
 
 A Flask-based web application that combines chatbot interfaces, machine learning prediction, user session management, and Telegram bot integration. Designed for interactive demos, educational use, or as a foundation for production ML/AI web services.
 
